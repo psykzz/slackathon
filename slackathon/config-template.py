@@ -1,0 +1,7 @@
+TOKEN = ""
+
+BOT_ALIASES = ()
+
+BOT_ADMINS = ()
+
+PLUGIN_PATHS = ()
