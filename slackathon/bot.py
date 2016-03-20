@@ -7,6 +7,8 @@ import inspect
 from yapsy.PluginManager import PluginManager
 from yapsy.PluginFileLocator import PluginFileLocator, PluginFileAnalyzerWithInfoFile
 
+from slackathon.event import SlackEvent
+
 logger = logging.getLogger(__name__)
 
 
@@ -81,14 +83,16 @@ class Bot(object):
 
     def parse_event(self, data):
         # Don't do anything with messages from myself
-        if data.get("user") == self.server.login_data["self"]["id"]:
+        event = SlackEvent(data, self.client)
+
+        if event.get("user") == self.server.login_data["self"]["id"]:
             return
 
         regex_fields = {"message": "text",
                         "reaction_added": "reaction",
                         "reaction_removed": "reaction"}
 
-        event_type = data["type"]
+        event_type = event["type"]
 
         # We want these to be list -copies-
         listen_commands = list(self.listen_commands.get(event_type) or [])
@@ -103,22 +107,22 @@ class Bot(object):
             matched_aliases = []
             alias_separators = [":", ",", ";"]
             for alias in self.config.BOT_ALIASES:
-                if data["text"].startswith(alias):
+                if event["text"].startswith(alias):
                     matched_aliases.append(alias)
 
             # We want to get the longest matched alias, to account for overlaps (ie. slack vs. slackbot))
             alias = max(matched_aliases, key=len)
             # Remove the alias from the text
-            data["text"] = data["text"][len(alias):]
+            event["text"] = event["text"][len(alias):]
 
             # If a separator was used, remove it
-            if data["text"][0] in alias_separators:
-                data["text"] = data["text"][1:]
+            if event["text"][0] in alias_separators:
+                event["text"] = event["text"][1:]
 
             # Strip leading whitespace
-            data["text"].lstrip()
+            event["text"].lstrip()
 
-        elif data.get("channel", "").startswith("D"):
+        elif event.get("channel", "").startswith("D"):
             # If we're in a DM, we want to accept ALL commands
             respond = True
             respond_commands.extend(listen_commands)
@@ -133,7 +137,7 @@ class Bot(object):
         if commands:
             for function, pattern in commands:
                 if field:
-                    match = pattern.search(data[field])
+                    match = pattern.search(event[field])
                     if match:
                         commands_to_run.append((function, match))
                 else:
@@ -143,16 +147,16 @@ class Bot(object):
             # Send to event filters
             if self.event_filters:
                 for f in self.event_filters:
-                    data = f(data, function.__name__)
+                    data = f(event, function.__name__)
 
-            if not data:
+            if not event:
                 return
 
             logger.debug("Running command {}".format(function.__name__))
             if match:
-                function(data, *match.groups())
+                function(event, *match.groups())
             else:
-                function(data)
+                function(event)
 
 
 def main(config_path=None):
