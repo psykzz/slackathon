@@ -84,14 +84,6 @@ class Bot(object):
         if data.get("user") == self.server.login_data["self"]["id"]:
             return
 
-        # Do event filters first
-        if self.event_filters:
-            for func in self.event_filters:
-                data = func(data)
-
-        if not data:
-            return
-
         regex_fields = {"message": "text",
                         "reaction_added": "reaction",
                         "reaction_removed": "reaction"}
@@ -148,6 +140,14 @@ class Bot(object):
                     commands_to_run.append((function, False))
 
         for function, match in commands_to_run:
+            # Send to event filters
+            if self.event_filters:
+                for f in self.event_filters:
+                    data = f(data, function.__name__)
+
+            if not data:
+                return
+
             logger.debug("Running command {}".format(function.__name__))
             if match:
                 function(data, *match.groups())
