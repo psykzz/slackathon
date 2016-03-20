@@ -81,7 +81,7 @@ class Bot(object):
 
     def parse_event(self, data):
         # Don't do anything with messages from myself
-        if data.get("user") == self.server.login_data["self"]["id"]
+        if data.get("user") == self.server.login_data["self"]["id"]:
             return
 
         # Do event filters first
