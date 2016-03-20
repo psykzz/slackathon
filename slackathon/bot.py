@@ -108,11 +108,24 @@ class Bot(object):
 
         # If the event is a message, check if the message starts with an alias for the bot, and remove the alias
         if event_type == "message":
+            matched_aliases = []
+            alias_separators = [":", ",", ";"]
             for alias in self.config.BOT_ALIASES:
                 if data["text"].startswith(alias):
-                    respond = True
-                    data["text"] = data["text"][len(alias):]
-                    break
+                    matched_aliases.append(alias)
+
+            # We want to get the longest matched alias, to account for overlaps (ie. slack vs. slackbot))
+            alias = max(matched_aliases, key=len)
+            # Remove the alias from the text
+            data["text"] = data["text"][len(alias):]
+
+            # If a separator was used, remove it
+            if data["text"][0] in alias_separators:
+                data["text"] = data["text"][1:]
+
+            # Strip leading whitespace
+            data["text"].lstrip()
+
         elif data.get("channel", "").startswith("D"):
             # If we're in a DM, we want to accept ALL commands
             respond = True
@@ -140,7 +153,6 @@ class Bot(object):
                 function(data, *match.groups())
             else:
                 function(data)
-
 
 
 def main(config_path=None):
