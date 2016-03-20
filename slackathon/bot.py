@@ -17,23 +17,21 @@ class Bot(object):
         self.event_filters = []
 
         self.config = config
-        self.client = slackclient.SlackClient(config.TOKEN)
+        self.client = self.init_client()
         self.server = self.client.server
 
         # Setup plugins
-        self.plugin_manager = PluginManager()
-        self.plugin_manager.setPluginPlaces(config.PLUGIN_PATHS)
-        self.plugin_manager.collectPlugins()
+        self.plugin_manager = self.init_plugin_manager()
         self.init_plugins()
 
     def init_plugins(self):
         for plugin_info in self.plugin_manager.getAllPlugins():
             logger.info("Loading plugin {}".format(plugin_info.name))
             self.plugin_manager.activatePluginByName(plugin_info.name)
-            self.add_commands_from_plugin(plugin_info.plugin_object)
+            self.get_commands(plugin_info.plugin_object)
             plugin_info.plugin_object.attach_bot(self)
 
-    def add_commands_from_plugin(self, plugin):
+    def get_commands(self, plugin):
         methods = inspect.getmembers(plugin, inspect.ismethod)
         for name, method in methods:
             if hasattr(method, "_command"):
@@ -46,12 +44,14 @@ class Bot(object):
             if hasattr(method, "_eventfilter"):
                 self.event_filters.append(method)
 
-    def get_plugin_manager(self):
+    def init_plugin_manager(self):
         locator = PluginFileLocator(PluginFileAnalyzerWithInfoFile('info_ext', 'plug'))
         plugin_manager = PluginManager(plugin_locator=locator)
         plugin_manager.setPluginPlaces(self.config.PLUGIN_PATHS)
+        plugin_manager.collectPlugins()
+        return plugin_manager
 
-    def get_client(self):
+    def init_client(self):
         token = self.config.TOKEN
         client = slackclient.SlackClient(token)
         auth_test = client.api_call('auth.test')
