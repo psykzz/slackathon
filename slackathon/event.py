@@ -1,4 +1,7 @@
 from collections import MutableMapping
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SlackEvent(MutableMapping):
     def __init__(self, data, client):
@@ -6,10 +9,10 @@ class SlackEvent(MutableMapping):
         self.client = client
 
     def __getitem__(self, item):
-        return self.data.get(item)
+        return self.data[item]
 
     def __setitem__(self, item, value):
-        self.data.set(item, value)
+        self.data[item] = value
 
     def __delitem__(self, item):
         del self.data[item]
@@ -22,8 +25,11 @@ class SlackEvent(MutableMapping):
 
     def reply(self, message=None, **kwargs):
         channel = self.data.get("channel") or self.data.get("item").get("channel")
-        if channel in self.data:
+        if channel:
             if kwargs:
-                self.client.api_call("chat.post_message", channel=channel, text=message, **kwargs)
+                self.client.api_call("chat.postMessage",
+                                     channel=channel,
+                                     text=message,
+                                     **kwargs)
             else:
                 self.client.rtm_send_message(channel, message)

@@ -47,7 +47,7 @@ class Bot(object):
                 self.event_filters.append(method)
 
     def init_plugin_manager(self):
-        locator = PluginFileLocator(PluginFileAnalyzerWithInfoFile('info_ext', 'plug'))
+        locator = PluginFileLocator([PluginFileAnalyzerWithInfoFile('info_ext', 'plug')])
         plugin_manager = PluginManager(plugin_locator=locator)
         plugin_manager.setPluginPlaces(self.config.PLUGIN_PATHS)
         plugin_manager.collectPlugins()
@@ -111,16 +111,18 @@ class Bot(object):
                     matched_aliases.append(alias)
 
             # We want to get the longest matched alias, to account for overlaps (ie. slack vs. slackbot))
-            alias = max(matched_aliases, key=len)
-            # Remove the alias from the text
-            event["text"] = event["text"][len(alias):]
+            if matched_aliases:
+                respond = True
+                alias = max(matched_aliases, key=len)
+                # Remove the alias from the text
+                event["text"] = event["text"][len(alias):]
 
-            # If a separator was used, remove it
-            if event["text"][0] in alias_separators:
-                event["text"] = event["text"][1:]
+                # If a separator was used, remove it
+                if event["text"][0] in alias_separators:
+                    event["text"] = event["text"][1:]
 
-            # Strip leading whitespace
-            event["text"].lstrip()
+                # Strip leading whitespace
+                event["text"].lstrip()
 
         elif event.get("channel", "").startswith("D"):
             # If we're in a DM, we want to accept ALL commands
