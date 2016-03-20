@@ -9,6 +9,7 @@ from yapsy.PluginFileLocator import PluginFileLocator, PluginFileAnalyzerWithInf
 
 logger = logging.getLogger(__name__)
 
+
 class Bot(object):
     def __init__(self, config):
         self.listen_commands = {}
@@ -17,6 +18,8 @@ class Bot(object):
 
         self.config = config
         self.client = slackclient.SlackClient(config.TOKEN)
+
+        # Setup plugins
         self.plugin_manager = PluginManager()
         self.plugin_manager.setPluginPlaces(config.PLUGIN_PATHS)
         self.plugin_manager.collectPlugins()
@@ -65,6 +68,9 @@ class Bot(object):
     def run(self):
         self.client.rtm_connect()
         logger.debug("Started RTM connection")
+        # Add username to bot aliases
+        self.config.BOT_ALIASES.extend([self.client.server.username, "<@{}>".format(self.client.server.login_data["self"]["id"])])
+
         while True:
             for data in self.client.rtm_read():
                 if data.get('ok'):
@@ -73,14 +79,55 @@ class Bot(object):
                 self.parse_event(data)
 
     def parse_event(self, data):
+        regex_fields = {"message": "text",
+                        "reaction_added": "reaction",
+                        "reaction_removed": "reaction"}
+
         event_type = data["type"]
-        listen_commands = self.listen_commands.get(event_type)
-        if listen_commands:
-            for function, pattern in listen_commands:
-                match = pattern.search(data["text"])
-                if match:
-                    logger.debug("Running command {}".format(function.__name__))
-                    function(data, *match.groups())
+
+        # We want these to be list -copies-
+        listen_commands = list(self.listen_commands.get(event_type) or [])
+        respond_commands = list(self.respond_commands.get(event_type) or [])
+
+        field = regex_fields.get(event_type)
+
+        respond = False
+
+        # If the event is a message, check if the message starts with an alias for the bot, and remove the alias
+        if event_type == "message":
+            for alias in self.config.BOT_ALIASES:
+                if data["text"].startswith(alias):
+                    respond = True
+                    data["text"] = data["text"][len(alias):]
+                    break
+        elif data.get("channel", "").startswith("D"):
+            # If we're in a DM, we want to accept ALL commands
+            respond = True
+            respond_commands.extend(listen_commands)
+            # Convert to a set and back to remove duplicate commands
+            respond_commands = list(set(respond_commands))
+
+        # Select which list of commands we want to use
+        commands = respond_commands if respond else listen_commands
+        commands_to_run = []
+
+        # Assemble a list of commands to run, we want to run all the ones that we can
+        if commands:
+            for function, pattern in commands:
+                if field:
+                    match = pattern.search(data[field])
+                    if match:
+                        commands_to_run.append((function, match))
+                else:
+                    commands_to_run.append((function, False))
+
+        for function, match in commands_to_run:
+            logger.debug("Running command {}".format(function.__name__))
+            if match:
+                function(data, *match.groups())
+            else:
+                function(data)
+
 
 
 def main(config_path=None):
