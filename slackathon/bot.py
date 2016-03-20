@@ -14,10 +14,11 @@ class Bot(object):
     def __init__(self, config):
         self.listen_commands = {}
         self.respond_commands = {}
-        self.cmdfilters = []
+        self.event_filters = []
 
         self.config = config
         self.client = slackclient.SlackClient(config.TOKEN)
+        self.server = self.client.server
 
         # Setup plugins
         self.plugin_manager = PluginManager()
@@ -42,8 +43,8 @@ class Bot(object):
                 else:
                     self.listen_commands.setdefault(method._event_type, [])
                     self.listen_commands[method._event_type].append((method, method._pattern))
-            if hasattr(method, "_cmdfilter"):
-                self.cmdfilters.append(method)
+            if hasattr(method, "_eventfilter"):
+                self.event_filters.append(method)
 
     def get_plugin_manager(self):
         locator = PluginFileLocator(PluginFileAnalyzerWithInfoFile('info_ext', 'plug'))
@@ -69,7 +70,7 @@ class Bot(object):
         self.client.rtm_connect()
         logger.debug("Started RTM connection")
         # Add username to bot aliases
-        self.config.BOT_ALIASES.extend([self.client.server.username, "<@{}>".format(self.client.server.login_data["self"]["id"])])
+        self.config.BOT_ALIASES.extend([self.server.username, "<@{}>".format(self.server.login_data["self"]["id"])])
 
         while True:
             for data in self.client.rtm_read():
@@ -79,6 +80,18 @@ class Bot(object):
                 self.parse_event(data)
 
     def parse_event(self, data):
+        # Don't do anything with messages from myself
+        if data.get("user") == self.server.login_data["self"]["id"]
+            return
+
+        # Do event filters first
+        if self.event_filters:
+            for func in self.event_filters:
+                data = func(data)
+
+        if not data:
+            return
+
         regex_fields = {"message": "text",
                         "reaction_added": "reaction",
                         "reaction_removed": "reaction"}
