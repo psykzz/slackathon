@@ -2,13 +2,16 @@ from yapsy.IPlugin import IPlugin
 import logging
 
 class BotPlugin(IPlugin):
-    def __init__(self):
-        self.bot = None
+    def __init__(self, bot=None):
+        self.bot = bot
         self.channels = None
         self.users = None
         self.client = None
         self.logger = logging.getLogger("slackathon.plugins.{}".format(self.__class__.__name__))
         super().__init__()
+        
+        if bot is not None:
+            self.attach_bot(bot)
 
     def attach_bot(self, bot):
         self.bot = bot
