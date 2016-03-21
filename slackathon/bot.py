@@ -103,7 +103,7 @@ class Bot(object):
         respond = False
 
         # If the event is a message, check if the message starts with an alias for the bot, and remove the alias
-        if event_type == "message":
+        if event_type == "message" and not event.get("channel", "").startswith("D"):
             matched_aliases = []
             alias_separators = [":", ",", ";"]
             for alias in self.config.BOT_ALIASES:
@@ -149,7 +149,7 @@ class Bot(object):
             # Send to event filters
             if self.event_filters:
                 for f in self.event_filters:
-                    data = f(event, function.__name__)
+                    event = f(event, function.__name__)
 
             if not event:
                 return

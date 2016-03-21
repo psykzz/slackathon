@@ -1,5 +1,5 @@
 from yapsy.IPlugin import IPlugin
-
+import logging
 
 class BotPlugin(IPlugin):
     def __init__(self):
@@ -7,6 +7,7 @@ class BotPlugin(IPlugin):
         self.channels = None
         self.users = None
         self.client = None
+        self.logger = logging.getLogger("slackathon.plugins.{}".format(self.__class__.__name__))
         super().__init__()
 
     def attach_bot(self, bot):
